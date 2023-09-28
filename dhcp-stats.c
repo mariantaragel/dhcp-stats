@@ -4,6 +4,11 @@
 
 int main(int argc, char *argv[])
 {
+    if (argc < 3) {
+        fprintf(stderr, "Incorrect number of arguments\n");
+        return 1;
+    }
+
     char *filename = argv[2];
     
     if (strcmp(argv[1], "-r") == 0) {
