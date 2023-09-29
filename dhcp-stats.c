@@ -81,6 +81,7 @@ int main(int argc, char *argv[])
         printf("%s is opened\n", cmd_options.filename);
     }
 
+    pcap_close(handle);
     clean(cmd_options);
 
     return EXIT_SUCCESS;
