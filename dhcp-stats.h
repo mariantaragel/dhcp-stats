@@ -15,4 +15,12 @@ const char usage[] =
     "   -i <interface>  interface to listen on\n"
     "   <ip-prefix>     net range for which stats will be generated\n";
 
+typedef struct cmd_options
+{
+    char *filename;
+    char *interface;
+    char **ip_prefixes;
+    int count_ip_prefixes;
+} cmd_options_t;
+
 #endif
