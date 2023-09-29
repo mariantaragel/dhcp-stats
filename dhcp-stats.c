@@ -19,14 +19,23 @@ int main(int argc, char *argv[])
     }
 
     char *filename = NULL;
+    char *interface = NULL;
 
     for (int optind = 0; optind < argc; optind++) {
         if (strcmp(argv[optind], "-r") == 0 && optind + 1 < argc) {
             filename = argv[optind + 1];
+        } else if (strcmp(argv[optind], "-i") == 0 && optind + 1 < argc) {
+            interface = argv[optind + 1];
         } else if (strcmp(argv[optind], "-h") == 0) {
             printf("%s", usage);
             return EXIT_SUCCESS;
         }
+    }
+
+    if ((filename == NULL && interface == NULL) ||
+        (filename != NULL && interface != NULL)) {
+        fprintf(stderr, "Invalid argument combination\n");
+        return EXIT_FAILURE;
     }
 
     pcap_t *handle;
