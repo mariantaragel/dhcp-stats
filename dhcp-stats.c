@@ -1,3 +1,10 @@
+/**
+ * @file dhcp-stats.c
+ * @author Marian Taragel (xtarag01)
+ * @brief Monitoring of DHCP communication
+ * @date 2023-09-29
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <pcap/pcap.h>

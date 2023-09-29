@@ -1,3 +1,10 @@
+/**
+ * @file dhcp-stats.h
+ * @author Marian Taragel (xtarag01)
+ * @brief Interface of dhcp-stats program
+ * @date 2023-09-27
+ */
+
 #ifndef DHCP_STATS_H
 #define DHCP_STATS_H
 
