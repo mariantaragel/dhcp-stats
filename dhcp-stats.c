@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <pcap/pcap.h>
+#include "dhcp-stats.h"
 
 int main(int argc, char *argv[])
 {
@@ -9,10 +10,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    char *filename = argv[2];
-    
-    if (strcmp(argv[1], "-r") == 0) {
-        printf("Filename: %s\n", filename);
+    char *filename = NULL;
+
+    for (int optind = 0; optind < argc; optind++) {
+        if (strcmp(argv[optind], "-r") == 0 && optind + 1 < argc) {
+            filename = argv[optind + 1];
+        } else if (strcmp(argv[optind], "-h") == 0) {
+            printf("%s", usage);
+            return 0;
+        }
     }
 
     return 0;
