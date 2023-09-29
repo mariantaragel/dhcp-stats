@@ -21,5 +21,15 @@ int main(int argc, char *argv[])
         }
     }
 
+    pcap_t *handle;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    handle = pcap_open_offline(filename, errbuf);
+    if (handle == NULL) {
+        fprintf(stderr, "%s\n", errbuf);
+        return 1;
+    } else {
+        printf("%s is opened\n", filename);
+    }
+
     return 0;
 }
