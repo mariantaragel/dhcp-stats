@@ -6,6 +6,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <pcap/pcap.h>
 #include "dhcp-stats.h"
@@ -14,7 +15,7 @@ int main(int argc, char *argv[])
 {
     if (argc < 3) {
         fprintf(stderr, "Incorrect number of arguments\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     char *filename = NULL;
@@ -24,7 +25,7 @@ int main(int argc, char *argv[])
             filename = argv[optind + 1];
         } else if (strcmp(argv[optind], "-h") == 0) {
             printf("%s", usage);
-            return 0;
+            return EXIT_SUCCESS;
         }
     }
 
@@ -33,10 +34,10 @@ int main(int argc, char *argv[])
     handle = pcap_open_offline(filename, errbuf);
     if (handle == NULL) {
         fprintf(stderr, "%s\n", errbuf);
-        return 1;
+        return EXIT_FAILURE;
     } else {
         printf("%s is opened\n", filename);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
