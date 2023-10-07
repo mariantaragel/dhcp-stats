@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Werror -pedantic -g -std=gnu17
-LDLIBS = -lpcap
+LDLIBS = -lpcap -lm
 
 dhcp-stats: dhcp-stats.o
 

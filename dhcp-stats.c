@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 #include <pcap/pcap.h>
 #include <arpa/inet.h>
 #include <net/ethernet.h>
@@ -93,6 +94,17 @@ int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options)
     return 0;
 }
 
+int count_valid_ip_addresses(unsigned int net_mask)
+{
+    int host_bits = 32 - net_mask;
+    return pow(2, host_bits) - 2;
+}
+
+int comparator (const void *a, const void *b)
+{
+    return *(int *) a - *(int *) b;
+}
+
 int main(int argc, char *argv[])
 {
     cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
@@ -118,6 +130,13 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    qsort(cmd_options.ip_prefixes, cmd_options.count_ip_prefixes, sizeof(ip_t), comparator);
+
+    printf("IP-Prefix Max-hosts Allocated addresses Utilization\n");
+    for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+        printf("%d %d\n", cmd_options.ip_prefixes[i].mask, count_valid_ip_addresses(cmd_options.ip_prefixes[i].mask));
+    }
+
     struct pcap_pkthdr *header;
     const unsigned char *packet;
     int ret_val;
@@ -130,7 +149,7 @@ int main(int argc, char *argv[])
             if (inet_ntop(AF_INET, &dhcp->yiaddr, str, INET_ADDRSTRLEN) == NULL) {
                 handle_error("inet_ntop");
             }
-            printf("%s\n", str);
+            //printf("%s\n", str);
         }
     }
 

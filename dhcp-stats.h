@@ -17,7 +17,7 @@ const char usage[] =
 
 typedef struct ip_address
 {
-    unsigned char address[sizeof(struct in_addr)];
+    uint32_t address;
     unsigned int mask;
 } ip_t;
 
