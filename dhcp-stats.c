@@ -41,7 +41,7 @@ ip_t get_ip_address(char *ip_address_s)
     }
 
     ip_t ip;
-    int s = inet_pton(AF_INET, address, ip.address);
+    int s = inet_pton(AF_INET, address, &ip.address);
     if (s <= 0) {
         if (s == 0)
             fprintf(stderr, "Not in presentation format\n");
@@ -132,8 +132,11 @@ int main(int argc, char *argv[])
 
     qsort(cmd_options.ip_prefixes, cmd_options.count_ip_prefixes, sizeof(ip_t), comparator);
 
+    char str_ip[INET_ADDRSTRLEN];
     printf("IP-Prefix Max-hosts Allocated addresses Utilization\n");
     for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+        inet_ntop(AF_INET, &cmd_options.ip_prefixes[i], str_ip, INET_ADDRSTRLEN);
+        printf("%s/", str_ip);
         printf("%d %d\n", cmd_options.ip_prefixes[i].mask, count_valid_ip_addresses(cmd_options.ip_prefixes[i].mask));
     }
 
