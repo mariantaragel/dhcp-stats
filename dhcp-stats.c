@@ -31,9 +31,9 @@ void clean(cmd_options_t cmd_options)
     }
 }
 
-ip_t get_ip_address(char *ip_address_s)
+ip_t get_ip_address(char *ip_address_str)
 {
-    char *address = strtok(ip_address_s, "/");
+    char *address = strtok(ip_address_str, "/");
     char *mask = strtok(NULL, "/");
     if (mask == NULL) {
         printf("Missing net prefix\n");
@@ -44,12 +44,17 @@ ip_t get_ip_address(char *ip_address_s)
     int s = inet_pton(AF_INET, address, &ip.address);
     if (s <= 0) {
         if (s == 0)
-            fprintf(stderr, "Not in presentation format\n");
+            fprintf(stderr, "IP address is not in correct format\n");
         else
             perror("inet_pton");
         exit(EXIT_FAILURE);
     }
-    int net_mask = atoi(mask);
+    char *endptr;
+    int net_mask = strtol(mask, &endptr, 10);
+    if (*endptr != '\0') {
+        fprintf(stderr, "Not a number\n");
+        exit(EXIT_FAILURE);
+    }
     ip.mask = net_mask;
 
     return ip;
@@ -91,18 +96,56 @@ int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options)
         return 1;
     }
 
+    qsort(cmd_options->ip_prefixes, cmd_options->count_ip_prefixes, sizeof(ip_t), comparator);
+
     return 0;
 }
 
 int count_valid_ip_addresses(unsigned int net_mask)
 {
-    int host_bits = 32 - net_mask;
+    int host_bits = IP_ADDR_BIT_LEN - net_mask;
     return pow(2, host_bits) - 2;
 }
 
 int comparator (const void *a, const void *b)
 {
     return *(int *) a - *(int *) b;
+}
+
+pcap_t *open_pcap(cmd_options_t cmd_options)
+{
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *handle;
+    
+    if (cmd_options.filename != NULL){
+        handle = pcap_open_offline(cmd_options.filename, errbuf);
+    } else if (cmd_options.interface != NULL) {
+        handle = pcap_open_live(cmd_options.interface, BUFSIZ, 1, 1000, errbuf);
+    }
+
+    if (handle == NULL) {
+        fprintf(stderr, "%s\n", errbuf);
+        clean(cmd_options);
+        exit(EXIT_FAILURE);
+    }
+
+    if (pcap_datalink(handle) != DLT_EN10MB) {
+        fprintf(stderr, "Device doesn't provide Ethernet headers - not supported");
+        pcap_close(handle);
+        clean(cmd_options);
+        exit(EXIT_FAILURE);
+    }
+
+    return handle;
+}
+
+void print_ip_address(uint32_t ip_address, char *end)
+{
+    char str[INET_ADDRSTRLEN];
+    if (inet_ntop(AF_INET, &ip_address, str, INET_ADDRSTRLEN) == NULL) {
+        handle_error("inet_ntop");
+    }
+    printf("%s%s", str, end);
 }
 
 int main(int argc, char *argv[])
@@ -113,30 +156,11 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle = pcap_open_offline(cmd_options.filename, errbuf);
+    pcap_t *handle = open_pcap(cmd_options);
     
-    if (handle == NULL) {
-        fprintf(stderr, "%s\n", errbuf);
-        pcap_close(handle);
-        clean(cmd_options);
-        return EXIT_FAILURE;
-    }
-
-    if (pcap_datalink(handle) != DLT_EN10MB) {
-        fprintf(stderr, "Device doesn't provide Ethernet headers - not supported");
-        pcap_close(handle);
-        clean(cmd_options);
-        return EXIT_FAILURE;
-    }
-
-    qsort(cmd_options.ip_prefixes, cmd_options.count_ip_prefixes, sizeof(ip_t), comparator);
-
-    char str_ip[INET_ADDRSTRLEN];
     printf("IP-Prefix Max-hosts Allocated addresses Utilization\n");
     for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
-        inet_ntop(AF_INET, &cmd_options.ip_prefixes[i], str_ip, INET_ADDRSTRLEN);
-        printf("%s/", str_ip);
+        print_ip_address(cmd_options.ip_prefixes[i].address, " ");
         printf("%d %d\n", cmd_options.ip_prefixes[i].mask, count_valid_ip_addresses(cmd_options.ip_prefixes[i].mask));
     }
 
@@ -148,11 +172,7 @@ int main(int argc, char *argv[])
             const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
             unsigned int size_ip = ip->ihl * 4;
             const struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
-            char str[INET_ADDRSTRLEN];
-            if (inet_ntop(AF_INET, &dhcp->yiaddr, str, INET_ADDRSTRLEN) == NULL) {
-                handle_error("inet_ntop");
-            }
-            //printf("%s\n", str);
+            print_ip_address(dhcp->yiaddr, "\n");
         }
     }
 

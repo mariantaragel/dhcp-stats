@@ -49,5 +49,15 @@ struct dhcphdr
 };
 
 #define UDP_HDR_LEN 8
+#define IP_ADDR_BIT_LEN 32
+
+void handle_error(char *error);
+void clean(cmd_options_t cmd_options);
+ip_t get_ip_address(char *ip_address_str);
+int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options);
+int count_valid_ip_addresses(unsigned int net_mask);
+int comparator (const void *a, const void *b);
+pcap_t *open_pcap(cmd_options_t cmd_options);
+void print_ip_address(uint32_t ip_address, char *end);
 
 #endif
