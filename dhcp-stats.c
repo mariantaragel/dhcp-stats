@@ -169,18 +169,28 @@ int main(int argc, char *argv[])
 
     pcap_t *handle = open_pcap(cmd_options);
 
+    struct bpf_program fp;
+    char filter_exp[] = "udp port 67 or 68";
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        printf("here");
+        return EXIT_FAILURE;
+    }
+    if (pcap_setfilter(handle, &fp) == -1) {
+        return EXIT_FAILURE;
+    }
+
     struct pcap_pkthdr *header;
     const unsigned char *packet;
     int ret_val;
     while ((ret_val = pcap_next_ex(handle, &header, &packet)) == 1) {
-        if (ret_val == 1) {
-            const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
-            unsigned int size_ip = ip->ihl * 4;
-            const struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
-            //print_ip_address(dhcp->yiaddr, "\n");
-            for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
-                is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i]);
-            }
+        const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
+        unsigned int size_ip = ip->ihl * 4;
+        struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
+        if (dhcp->dhcp_msg_type != DHCP_ACK) {
+            continue;
+        }
+        for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+            is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i]);
         }
     }
 

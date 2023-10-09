@@ -47,11 +47,15 @@ struct dhcphdr
     unsigned char chaddr[16];
     unsigned char sname[64];
     unsigned char file[128];
+    uint32_t magic_cookie;
+    unsigned char opt_type[2];
+    unsigned char dhcp_msg_type;
     unsigned char *options;
 };
 
 #define TRUE 1
 #define FALSE 2
+#define DHCP_ACK 5
 #define UDP_HDR_LEN 8
 #define IP_ADDR_BIT_LEN 32
 
