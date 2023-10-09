@@ -2,7 +2,7 @@
  * @file dhcp-stats.c
  * @author Marian Taragel (xtarag01)
  * @brief Monitoring of DHCP communication
- * @date 7.10.2023
+ * @date 9.10.2023
  */
 
 #include <stdio.h>
@@ -56,6 +56,8 @@ ip_t get_ip_address(char *ip_address_str)
         exit(EXIT_FAILURE);
     }
     ip.mask = net_mask;
+    ip.num_of_valid_ipaddr = count_valid_ip_addresses(net_mask);
+    ip.allocated_ipaddr = 0;
 
     return ip;
 }
@@ -109,7 +111,9 @@ int count_valid_ip_addresses(unsigned int net_mask)
 
 int comparator (const void *a, const void *b)
 {
-    return *(int *) a - *(int *) b;
+    ip_t *ipA = (ip_t *)a;
+    ip_t *ipB = (ip_t *)b;
+    return ipA->mask - ipB->mask;
 }
 
 pcap_t *open_pcap(cmd_options_t cmd_options)
@@ -148,6 +152,13 @@ void print_ip_address(uint32_t ip_address, char *end)
     printf("%s%s", str, end);
 }
 
+void is_ipaddr_in_subnet(uint32_t yiaddr, ip_t *subnet)
+{
+    uint32_t net_mask = 0xFFFFFFFF << (IP_ADDR_BIT_LEN - subnet->mask);
+    if ((yiaddr & htonl(net_mask)) == subnet->address)
+        subnet->allocated_ipaddr++;
+}
+
 int main(int argc, char *argv[])
 {
     cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
@@ -157,12 +168,6 @@ int main(int argc, char *argv[])
     }
 
     pcap_t *handle = open_pcap(cmd_options);
-    
-    printf("IP-Prefix Max-hosts Allocated addresses Utilization\n");
-    for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
-        print_ip_address(cmd_options.ip_prefixes[i].address, " ");
-        printf("%d %d\n", cmd_options.ip_prefixes[i].mask, count_valid_ip_addresses(cmd_options.ip_prefixes[i].mask));
-    }
 
     struct pcap_pkthdr *header;
     const unsigned char *packet;
@@ -172,8 +177,20 @@ int main(int argc, char *argv[])
             const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
             unsigned int size_ip = ip->ihl * 4;
             const struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
-            print_ip_address(dhcp->yiaddr, "\n");
+            //print_ip_address(dhcp->yiaddr, "\n");
+            for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+                is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i]);
+            }
         }
+    }
+
+    printf("IP-Prefix Max-hosts Allocated addresses Utilization\n");
+    for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+        print_ip_address(cmd_options.ip_prefixes[i].address, "/");
+        printf("%d %d %d %.2f%%\n", cmd_options.ip_prefixes[i].mask,
+                            cmd_options.ip_prefixes[i].num_of_valid_ipaddr,
+                            cmd_options.ip_prefixes[i].allocated_ipaddr,
+                            (float) cmd_options.ip_prefixes[i].allocated_ipaddr / (float) cmd_options.ip_prefixes[i].num_of_valid_ipaddr * 100);
     }
 
     pcap_close(handle);

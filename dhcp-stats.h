@@ -2,7 +2,7 @@
  * @file dhcp-stats.h
  * @author Marian Taragel (xtarag01)
  * @brief Interface of dhcp-stats program
- * @date 7.10.2023
+ * @date 9.10.2023
  */
 
 #ifndef DHCP_STATS_H
@@ -19,6 +19,8 @@ typedef struct ip_address
 {
     uint32_t address;
     unsigned int mask;
+    unsigned int num_of_valid_ipaddr;
+    unsigned int allocated_ipaddr;
 } ip_t;
 
 typedef struct cmd_options
@@ -48,6 +50,8 @@ struct dhcphdr
     unsigned char *options;
 };
 
+#define TRUE 1
+#define FALSE 2
 #define UDP_HDR_LEN 8
 #define IP_ADDR_BIT_LEN 32
 
