@@ -2,7 +2,7 @@
  * @file dhcp-stats.c
  * @author Marian Taragel (xtarag01)
  * @brief Monitoring of DHCP communication
- * @date 9.10.2023
+ * @date 10.10.2023
  */
 
 #include <stdio.h>
@@ -159,6 +159,15 @@ void is_ipaddr_in_subnet(uint32_t yiaddr, ip_t *subnet)
         subnet->allocated_ipaddr++;
 }
 
+int is_addr_in_list(uint32_t ip_addr, ip_addr_list_t ip_addr_list)
+{
+    for (int i = 0; i < ip_addr_list.len; i++) {
+        if (ip_addr_list.list[i] == ip_addr)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 int main(int argc, char *argv[])
 {
     cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
@@ -182,15 +191,26 @@ int main(int argc, char *argv[])
     struct pcap_pkthdr *header;
     const unsigned char *packet;
     int ret_val;
+    ip_addr_list_t ip_addr_list = {NULL, 0};
     while ((ret_val = pcap_next_ex(handle, &header, &packet)) == 1) {
         const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
         unsigned int size_ip = ip->ihl * 4;
         struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
-        if (dhcp->dhcp_msg_type != DHCP_ACK) {
-            continue;
-        }
-        for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
-            is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i]);
+        if (dhcp->dhcp_msg_type == DHCP_ACK) {
+            if (is_addr_in_list(dhcp->yiaddr, ip_addr_list) == FALSE) {
+                ip_addr_list.len++;
+                ip_addr_list.list = (uint32_t *) realloc(ip_addr_list.list, sizeof(uint32_t) * ip_addr_list.len);
+                if (ip_addr_list.list == NULL) {
+                    free(ip_addr_list.list);
+                    clean(cmd_options);
+                    handle_error("realloc");
+                }
+                ip_addr_list.list[ip_addr_list.len - 1] = dhcp->yiaddr;
+            
+                for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+                    is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i]);
+                }
+            }
         }
     }
 
@@ -205,6 +225,7 @@ int main(int argc, char *argv[])
 
     pcap_close(handle);
     clean(cmd_options);
+    free(ip_addr_list.list);
 
     return EXIT_SUCCESS;
 }

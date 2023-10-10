@@ -2,7 +2,7 @@
  * @file dhcp-stats.h
  * @author Marian Taragel (xtarag01)
  * @brief Interface of dhcp-stats program
- * @date 9.10.2023
+ * @date 10.10.2023
  */
 
 #ifndef DHCP_STATS_H
@@ -52,6 +52,12 @@ struct dhcphdr
     unsigned char dhcp_msg_type;
     unsigned char *options;
 };
+
+typedef struct ip_addr_list
+{
+    uint32_t *list;
+    int len;
+} ip_addr_list_t;
 
 #define TRUE 1
 #define FALSE 2
