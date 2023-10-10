@@ -60,7 +60,7 @@ typedef struct ip_addr_list
 } ip_addr_list_t;
 
 #define TRUE 1
-#define FALSE 2
+#define FALSE 0
 #define DHCP_ACK 5
 #define UDP_HDR_LEN 8
 #define IP_ADDR_BIT_LEN 32

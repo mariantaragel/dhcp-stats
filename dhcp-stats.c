@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#include <ncurses.h>
 #include <pcap/pcap.h>
 #include <arpa/inet.h>
 #include <net/ethernet.h>
@@ -143,15 +144,6 @@ pcap_t *open_pcap(cmd_options_t cmd_options)
     return handle;
 }
 
-void print_ip_address(uint32_t ip_address, char *end)
-{
-    char str[INET_ADDRSTRLEN];
-    if (inet_ntop(AF_INET, &ip_address, str, INET_ADDRSTRLEN) == NULL) {
-        handle_error("inet_ntop");
-    }
-    printf("%s%s", str, end);
-}
-
 void is_ipaddr_in_subnet(uint32_t yiaddr, ip_t *subnet)
 {
     uint32_t net_mask = 0xFFFFFFFF << (IP_ADDR_BIT_LEN - subnet->mask);
@@ -166,6 +158,22 @@ int is_addr_in_list(uint32_t ip_addr, ip_addr_list_t ip_addr_list)
             return TRUE;
     }
     return FALSE;
+}
+
+void print_stats(cmd_options_t cmd_options)
+{
+    mvprintw(0, 0,"IP-Prefix Max-hosts Allocated addresses Utilization\n");
+    for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+        char str[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &cmd_options.ip_prefixes[i].address, str, INET_ADDRSTRLEN) == NULL) {
+            handle_error("inet_ntop");
+        }
+        mvprintw(i + 1, 0, "%s %d %d %d %.2f%%\n", str, cmd_options.ip_prefixes[i].mask,
+                            cmd_options.ip_prefixes[i].num_of_valid_ipaddr,
+                            cmd_options.ip_prefixes[i].allocated_ipaddr,
+                            (float) cmd_options.ip_prefixes[i].allocated_ipaddr / (float) cmd_options.ip_prefixes[i].num_of_valid_ipaddr * 100);
+    }
+    refresh();
 }
 
 int main(int argc, char *argv[])
@@ -192,6 +200,8 @@ int main(int argc, char *argv[])
     const unsigned char *packet;
     int ret_val;
     ip_addr_list_t ip_addr_list = {NULL, 0};
+    initscr();
+    print_stats(cmd_options);
     while ((ret_val = pcap_next_ex(handle, &header, &packet)) == 1) {
         const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
         unsigned int size_ip = ip->ihl * 4;
@@ -210,18 +220,12 @@ int main(int argc, char *argv[])
                 for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
                     is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i]);
                 }
+                print_stats(cmd_options);
             }
         }
     }
-
-    printf("IP-Prefix Max-hosts Allocated addresses Utilization\n");
-    for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
-        print_ip_address(cmd_options.ip_prefixes[i].address, "/");
-        printf("%d %d %d %.2f%%\n", cmd_options.ip_prefixes[i].mask,
-                            cmd_options.ip_prefixes[i].num_of_valid_ipaddr,
-                            cmd_options.ip_prefixes[i].allocated_ipaddr,
-                            (float) cmd_options.ip_prefixes[i].allocated_ipaddr / (float) cmd_options.ip_prefixes[i].num_of_valid_ipaddr * 100);
-    }
+    getch();
+    endwin();
 
     pcap_close(handle);
     clean(cmd_options);
