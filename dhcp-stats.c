@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <ncurses.h>
+#include <signal.h>
 #include <pcap/pcap.h>
 #include <arpa/inet.h>
 #include <net/ethernet.h>
@@ -168,7 +169,7 @@ void print_stats(cmd_options_t cmd_options)
         if (inet_ntop(AF_INET, &cmd_options.ip_prefixes[i].address, str, INET_ADDRSTRLEN) == NULL) {
             handle_error("inet_ntop");
         }
-        mvprintw(i + 1, 0, "%s %d %d %d %.2f%%\n", str, cmd_options.ip_prefixes[i].mask,
+        mvprintw(i + 1, 0, "%s/%d %d %d %.2f%%\n", str, cmd_options.ip_prefixes[i].mask,
                             cmd_options.ip_prefixes[i].num_of_valid_ipaddr,
                             cmd_options.ip_prefixes[i].allocated_ipaddr,
                             (float) cmd_options.ip_prefixes[i].allocated_ipaddr / (float) cmd_options.ip_prefixes[i].num_of_valid_ipaddr * 100);
@@ -212,8 +213,16 @@ int apply_filter(pcap_t *handle)
     return 0;
 }
 
+void sig_handler(int signum)
+{
+    endwin();
+    exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char *argv[])
 {
+    signal(SIGINT, sig_handler);
+
     cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
     if (parse_arguments(argc, argv, &cmd_options)){
         clean(cmd_options);
