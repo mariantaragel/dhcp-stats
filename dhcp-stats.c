@@ -176,23 +176,53 @@ void print_stats(cmd_options_t cmd_options)
     refresh();
 }
 
+int get_dhcp_msg_type(unsigned char *options, int dhcp_options_length)
+{
+    int dhcp_msg_type = -1;
+    for (int i = 0; i < dhcp_options_length; i++) {
+        uint8_t opcode = options[i];
+        if (opcode == 53) {
+            dhcp_msg_type = options[i + 2];
+        } else if (opcode == 0) {
+            continue;
+        } else if (opcode == 255) {
+            break;
+        }
+        i += options[i + 1] + 1;
+    }
+
+    return dhcp_msg_type;
+}
+
+int apply_filter(pcap_t *handle)
+{
+    struct bpf_program fp;
+    char filter_exp[] = "udp port 67 or 68";
+    
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "Cannot compile filter expresion\n");
+        return 1;
+    }
+    
+    if (pcap_setfilter(handle, &fp) == -1) {
+        fprintf(stderr, "Failed to set filter\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
-    if (parse_arguments(argc, argv, &cmd_options) == 1){
+    if (parse_arguments(argc, argv, &cmd_options)){
         clean(cmd_options);
         return EXIT_FAILURE;
     }
 
     pcap_t *handle = open_pcap(cmd_options);
-
-    struct bpf_program fp;
-    char filter_exp[] = "udp port 67 or 68";
-    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
-        printf("here");
-        return EXIT_FAILURE;
-    }
-    if (pcap_setfilter(handle, &fp) == -1) {
+    if (apply_filter(handle)) {
+        clean(cmd_options);
         return EXIT_FAILURE;
     }
 
@@ -205,8 +235,11 @@ int main(int argc, char *argv[])
     while ((ret_val = pcap_next_ex(handle, &header, &packet)) == 1) {
         const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
         unsigned int size_ip = ip->ihl * 4;
+        const struct udphdr *udp = (struct udphdr *) (packet + ETHER_HDR_LEN + size_ip);
         struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
-        if (dhcp->dhcp_msg_type == DHCP_ACK) {
+        size_t size_udp_payload = (ntohs(udp->len) - UDP_HDR_LEN);
+        size_t size_dhcp_options = size_udp_payload - sizeof(struct dhcphdr);
+        if (get_dhcp_msg_type(dhcp->options, size_dhcp_options) == DHCP_ACK) {
             if (is_addr_in_list(dhcp->yiaddr, ip_addr_list) == FALSE) {
                 ip_addr_list.len++;
                 ip_addr_list.list = (uint32_t *) realloc(ip_addr_list.list, sizeof(uint32_t) * ip_addr_list.len);
