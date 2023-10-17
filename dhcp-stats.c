@@ -2,7 +2,7 @@
  * @file dhcp-stats.c
  * @author Marian Taragel (xtarag01)
  * @brief Monitoring of DHCP communication
- * @date 13.10.2023
+ * @date 17.10.2023
  */
 
 #include <stdio.h>
@@ -20,17 +20,11 @@
 #include <netinet/udp.h>
 #include "dhcp-stats.h"
 
-void handle_error(char *error)
+void clean(void *pointer)
 {
-    perror(error);
-    exit(EXIT_FAILURE);
-}
-
-void clean(ip_t *ip_prefixes)
-{
-    if (ip_prefixes != NULL) {
-        free(ip_prefixes);
-        ip_prefixes = NULL;
+    if (pointer != NULL) {
+        free(pointer);
+        pointer = NULL;
     }
 }
 
@@ -67,6 +61,7 @@ int string_to_ip_address(char *string, ip_t *ip)
     ip->mask = net_mask;
     ip->num_of_valid_ipaddr = count_valid_ip_addresses(net_mask);
     ip->allocated_ipaddr = 0;
+    ip->is_logged = FALSE;
 
     return 0;
 }
@@ -99,7 +94,8 @@ int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options)
             cmd_options->ip_prefixes = (ip_t *) realloc(cmd_options->ip_prefixes, cmd_options->count_ip_prefixes * sizeof(ip_t));
             if (cmd_options->ip_prefixes == NULL) {
                 free(cmd_options->ip_prefixes);
-                handle_error("realloc");
+                perror("realloc");
+                exit(EXIT_FAILURE);
             }
 
             cmd_options->ip_prefixes[cmd_options->count_ip_prefixes - 1] = ip_prefix;
@@ -148,15 +144,13 @@ pcap_t *open_pcap(cmd_options_t cmd_options)
 
     if (handle == NULL) {
         fprintf(stderr, "%s\n", errbuf);
-        clean(cmd_options.ip_prefixes);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     if (pcap_datalink(handle) != DLT_EN10MB) {
         fprintf(stderr, "Device doesn't provide Ethernet headers - not supported");
         pcap_close(handle);
-        clean(cmd_options.ip_prefixes);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     return handle;
@@ -181,24 +175,29 @@ int is_ipaddr_in_list(uint32_t ip_addr, ip_addr_list_t ip_addr_list)
     return FALSE;
 }
 
-void print_stats(cmd_options_t cmd_options)
+int print_stats(cmd_options_t cmd_options)
 {
     mvprintw(0, 0,"IP-Prefix Max-hosts Allocated addresses Utilization\n");
 
     for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+        ip_t ip_prefix = cmd_options.ip_prefixes[i];
+        float allocation_precentage = calc_alloc_precent(ip_prefix);
+
         char ipaddr_str[INET_ADDRSTRLEN];
-        if (inet_ntop(AF_INET, &cmd_options.ip_prefixes[i].address, ipaddr_str, INET_ADDRSTRLEN) == NULL) {
-            clean(cmd_options.ip_prefixes);
-            handle_error("inet_ntop");
+        if (inet_ntop(AF_INET, &ip_prefix.address, ipaddr_str, INET_ADDRSTRLEN) == NULL) {
+            perror("inet_ntop");
+            return 1;
         }
 
-        mvprintw(i + 1, 0, "%s/%d %ld %d %.2f%%\n", ipaddr_str, cmd_options.ip_prefixes[i].mask,
-                            cmd_options.ip_prefixes[i].num_of_valid_ipaddr,
-                            cmd_options.ip_prefixes[i].allocated_ipaddr,
-                            (float) cmd_options.ip_prefixes[i].allocated_ipaddr / (float) cmd_options.ip_prefixes[i].num_of_valid_ipaddr * 100);
+        mvprintw(i + 1, 0, "%s/%d %ld %d %.2f%%\n", ipaddr_str, ip_prefix.mask,
+                            ip_prefix.num_of_valid_ipaddr,
+                            ip_prefix.allocated_ipaddr,
+                            allocation_precentage);
     }
     
     refresh();
+    
+    return 0;
 }
 
 int get_dhcp_msg_type(const unsigned char *options, int dhcp_options_length)
@@ -244,53 +243,112 @@ void sig_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
-void read_packets(cmd_options_t cmd_options, pcap_t *handle)
+int read_packets(cmd_options_t cmd_options, pcap_t *handle)
 {
-    struct pcap_pkthdr *header;
-    const unsigned char *packet;
+    initscr();
+
+    if (print_stats(cmd_options)) {
+        endwin();
+        return 1;
+    }
+
     ip_addr_list_t ip_addr_list = {NULL, 0};
 
-    initscr();
-    print_stats(cmd_options);
-    
-    while (pcap_next_ex(handle, &header, &packet) == 1) {
-        const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
-        unsigned int size_ip = ip->ihl * 4;
+    while (TRUE) {
+        struct pcap_pkthdr *header;
+        const unsigned char *packet;
+        
+        int ret_val = pcap_next_ex(handle, &header, &packet);
+        
+        if (ret_val == 1) {
+            if (parse_packet(packet, cmd_options, &ip_addr_list)) {
+                clean(ip_addr_list.list);
+                endwin();
+                return 1;
+            }
+        } else if (ret_val == 0) {
+            continue;
+        } else if (ret_val == PCAP_ERROR_BREAK) {
+            continue;
+        } else {
+            clean(ip_addr_list.list);
+            endwin();
+            return 1;
+        }
+    }
 
-        const struct udphdr *udp = (struct udphdr *) (packet + ETHER_HDR_LEN + size_ip);
-        unsigned int size_udp_payload = (ntohs(udp->len) - UDP_HDR_LEN);
+    clean(ip_addr_list.list);
+    endwin();
+    return 0;
+}
 
-        const struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
-        unsigned int size_dhcp_options = size_udp_payload - sizeof(struct dhcphdr);
+int create_log(ip_t prefix)
+{
+    if (prefix.is_logged == FALSE) {
+        openlog("dhcp-stats", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_USER);
 
-        if (get_dhcp_msg_type(dhcp->options, size_dhcp_options) == DHCP_ACK) {
-            if (is_ipaddr_in_list(dhcp->yiaddr, ip_addr_list) == FALSE) {
-                
-                ip_addr_list.len++;
-                ip_addr_list.list = (uint32_t *) realloc(ip_addr_list.list, sizeof(uint32_t) * ip_addr_list.len);
-                if (ip_addr_list.list == NULL) {
-                    free(ip_addr_list.list);
-                    clean(cmd_options.ip_prefixes);
-                    handle_error("realloc");
-                }
-                
-                ip_addr_list.list[ip_addr_list.len - 1] = dhcp->yiaddr;
+        char ipaddr_str[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &prefix.address, ipaddr_str, INET_ADDRSTRLEN) == NULL) {
+            closelog();
+            perror("inet_ntop");
+            return 1;
+        }
+
+        syslog(LOG_NOTICE, "prefix %s/%d exceeded 50%% of allocations", ipaddr_str, prefix.mask);
+        closelog();
+
+        prefix.is_logged = TRUE;
+    }
+
+    return 0;
+}
+
+float calc_alloc_precent(ip_t ip_prefix)
+{
+    return (float) ip_prefix.allocated_ipaddr / (float) ip_prefix.num_of_valid_ipaddr * 100.0;
+}
+
+int parse_packet(const unsigned char *packet, cmd_options_t cmd_options, ip_addr_list_t *ip_addr_list)
+{
+    const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
+    unsigned int size_ip = ip->ihl * 4;
+
+    const struct udphdr *udp = (struct udphdr *) (packet + ETHER_HDR_LEN + size_ip);
+    unsigned int size_udp_payload = (ntohs(udp->len) - UDP_HDR_LEN);
+
+    const struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
+    unsigned int size_dhcp_options = size_udp_payload - sizeof(struct dhcphdr);
+
+    if (get_dhcp_msg_type(dhcp->options, size_dhcp_options) == DHCP_ACK) {
+        if (is_ipaddr_in_list(dhcp->yiaddr, *ip_addr_list) == FALSE) {
             
-                for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
-                    if (is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i]))
-                        cmd_options.ip_prefixes[i].allocated_ipaddr++;
+            (* ip_addr_list).len++;
+            (* ip_addr_list).list = (uint32_t *) realloc((* ip_addr_list).list, sizeof(uint32_t) * (* ip_addr_list).len);
+            if ((* ip_addr_list).list == NULL) {
+                perror("realloc");
+                return 1;
+            }
+            
+            (* ip_addr_list).list[(* ip_addr_list).len - 1] = dhcp->yiaddr;
+        
+            for (int i = 0; i < cmd_options.count_ip_prefixes; i++) {
+                if (is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i])) {
+                    cmd_options.ip_prefixes[i].allocated_ipaddr++;
+                    if (calc_alloc_precent(cmd_options.ip_prefixes[i]) > 50.0) {
+                        if (create_log(cmd_options.ip_prefixes[i])) {
+                            return 1;
+                        }
+                    }
                 }
+            }
 
-                print_stats(cmd_options);
+            if (print_stats(cmd_options)) {
+                return 1;
             }
         }
     }
-    
-    if (ip_addr_list.list != NULL) {
-        free(ip_addr_list.list);
-        ip_addr_list.list = NULL;
-    }
-    endwin();
+
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -304,12 +362,23 @@ int main(int argc, char *argv[])
     }
 
     pcap_t *handle = open_pcap(cmd_options);
-    if (apply_filter(handle)) {
+    if (handle == NULL) {
         clean(cmd_options.ip_prefixes);
         return EXIT_FAILURE;
     }
 
-    read_packets(cmd_options, handle);
+    if (apply_filter(handle)) {
+        clean(cmd_options.ip_prefixes);
+        pcap_close(handle);
+        return EXIT_FAILURE;
+    }
+
+
+    if (read_packets(cmd_options, handle)) {
+        clean(cmd_options.ip_prefixes);
+        pcap_close(handle);
+        return EXIT_FAILURE;
+    }
 
     pcap_close(handle);
     clean(cmd_options.ip_prefixes);
