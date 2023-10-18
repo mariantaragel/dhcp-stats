@@ -77,7 +77,7 @@ int get_dhcp_msg_type(const unsigned char *options, int dhcp_options_length);
 int apply_filter(pcap_t *handle);
 void sig_handler(int signum);
 int read_packets(cmd_options_t cmd_options, pcap_t *handle);
-int create_log(ip_t prefix);
+int create_log(ip_t *prefix);
 float calc_alloc_precent(ip_t ip_prefix);
 int parse_packet(const unsigned char *packet, cmd_options_t cmd_options, ip_addr_list_t *ip_addr_list);
 

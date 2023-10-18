@@ -282,22 +282,22 @@ int read_packets(cmd_options_t cmd_options, pcap_t *handle)
     return 0;
 }
 
-int create_log(ip_t prefix)
+int create_log(ip_t *prefix)
 {
-    if (prefix.is_logged == FALSE) {
+    if (prefix->is_logged == FALSE) {
         openlog("dhcp-stats", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_USER);
 
         char ipaddr_str[INET_ADDRSTRLEN];
-        if (inet_ntop(AF_INET, &prefix.address, ipaddr_str, INET_ADDRSTRLEN) == NULL) {
+        if (inet_ntop(AF_INET, &prefix->address, ipaddr_str, INET_ADDRSTRLEN) == NULL) {
             closelog();
             perror("inet_ntop");
             return 1;
         }
 
-        syslog(LOG_NOTICE, "prefix %s/%d exceeded 50%% of allocations", ipaddr_str, prefix.mask);
+        syslog(LOG_NOTICE, "prefix %s/%d exceeded 50%% of allocations", ipaddr_str, prefix->mask);
         closelog();
 
-        prefix.is_logged = TRUE;
+        prefix->is_logged = TRUE;
     }
 
     return 0;
@@ -335,7 +335,7 @@ int parse_packet(const unsigned char *packet, cmd_options_t cmd_options, ip_addr
                 if (is_ipaddr_in_subnet(dhcp->yiaddr, &cmd_options.ip_prefixes[i])) {
                     cmd_options.ip_prefixes[i].allocated_ipaddr++;
                     if (calc_alloc_precent(cmd_options.ip_prefixes[i]) > 50.0) {
-                        if (create_log(cmd_options.ip_prefixes[i])) {
+                        if (create_log(&cmd_options.ip_prefixes[i])) {
                             return 1;
                         }
                     }
