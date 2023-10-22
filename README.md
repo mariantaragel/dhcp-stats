@@ -5,7 +5,7 @@
 **Date:** 22.10.2023
 
 ## Project description
-krátký textový popis programu s případnými rozšířeními či omezeními
+The program will monitor DHCP traffic and show stats about IP prefix utilization. When the IP prefix exceeds 50 % of the allocated IP addressed, the program will notify the administrator through syslog. The program can generate stats from a pcap file. It can also listen on a network interface.
 
 ## CLI Syntax
 ```
