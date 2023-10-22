@@ -2,7 +2,7 @@
  * @file dhcp-stats.c
  * @author Marian Taragel (xtarag01)
  * @brief Monitoring of DHCP communication
- * @date 17.10.2023
+ * @date 22.10.2023
  */
 
 #include <stdio.h>
@@ -19,6 +19,9 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include "dhcp-stats.h"
+
+cmd_options_t cmd_options;
+ip_addr_list_t ip_addr_list;
 
 void clean(void *pointer)
 {
@@ -239,6 +242,8 @@ int apply_filter(pcap_t *handle)
 
 void sig_handler(int signum)
 {
+    clean(cmd_options.ip_prefixes);
+    clean(ip_addr_list.list);
     endwin();
     exit(EXIT_SUCCESS);
 }
