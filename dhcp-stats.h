@@ -1,8 +1,8 @@
 /**
  * @file dhcp-stats.h
- * @author Marian Taragel (xtarag01)
+ * @author Marián Tarageľ (xtarag01)
  * @brief Interface of dhcp-stats program
- * @date 22.10.2023
+ * @date 23.10.2023
  */
 
 #ifndef DHCP_STATS_H
@@ -19,7 +19,7 @@ typedef struct ip_address
 {
     uint32_t address;
     unsigned int mask;
-    long int num_of_valid_ipaddr;
+    long int num_of_useable_ipaddr;
     unsigned int allocated_ipaddr;
     int is_logged;
 } ip_t;
@@ -58,146 +58,160 @@ typedef struct ip_addr_list
     int len;
 } ip_addr_list_t;
 
-#define TRUE 1
 #define FALSE 0
+#define TRUE 1
 #define DHCP_ACK 5
 #define UDP_HDR_LEN 8
+#define ETHER_HDR_LEN 14
 #define IP_ADDR_BIT_LEN 32
+#define OPT_MSG_TYPE 53
+#define DHCP_HDR_LEN 240
+#define OPT_END 255
 
 /**
- * @brief 
+ * @brief Free allocted memory
  * 
- * @param pointer 
+ * @param pointer Generic pointer on allocated memory block
  */
 void clean(void *pointer);
 
 /**
- * @brief 
+ * @brief Convert string to IPv4 address binary format
  * 
- * @param string 
- * @param ip 
- * @return int 
+ * @param string String to convert
+ * @param ip Structure for storing result
+ * @return 0 on success, 1 on error
  */
 int string_to_ip_address(char *string, ip_t *ip);
 
 /**
- * @brief 
+ * @brief Parse command-line arguments 
  * 
- * @param argc 
- * @param argv 
- * @param cmd_options 
- * @return int 
+ * @param argc Number of arguments
+ * @param argv Array of arguments
+ * @param cmd_options Structure for storing results of parsing
+ * @return 0 on success, 1 on error
  */
 int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options);
 
 /**
- * @brief 
+ * @brief Calculate number of useable IPv4 addresses in subnet
  * 
- * @param net_mask 
- * @return long int 
+ * @param net_mask Network subnet mask
+ * @return Number of useable IPv4 addresses
  */
-long int count_valid_ip_addresses(unsigned int net_mask);
+long int count_useable_ip_addresses(unsigned int net_mask);
 
 /**
- * @brief 
+ * @brief Compare net masks of IP prefixes
  * 
- * @param a 
- * @param b 
- * @return int 
+ * @param ip_prefix_a First IP prefix
+ * @param ip_prefix_b Second IP prefix
+ * @return Difference between net masks
  */
-int comparator(const void *a, const void *b);
+int comparator(const void *ip_prefix_a, const void *ip_prefix_b);
 
 /**
- * @brief 
+ * @brief Open connection for sniffing or open pcap file
  * 
- * @param cmd_options 
- * @return pcap_t* 
+ * @param cmd_options Entered command-line arguments
+ * @return (pcap_t *) coonection on success, NULL on error
  */
 pcap_t *open_pcap(cmd_options_t cmd_options);
 
 /**
- * @brief 
+ * @brief Check whether IP is in network subnet
  * 
- * @param yiaddr 
- * @param subnet 
- * @return int 
+ * @param ip_addr IP address to check
+ * @param subnet Network subnet (mask and network ip address)
+ * @return TRUE when ip address is in network subnet, else FALSE 
  */
-int is_ipaddr_in_subnet(uint32_t yiaddr, ip_t *subnet);
+int is_ipaddr_in_subnet(uint32_t ip_addr, ip_t *subnet);
 
 /**
- * @brief 
+ * @brief Check whether IP address was already seen
  * 
- * @param ip_addr 
- * @param ip_addr_list 
- * @return int 
+ * @param ip_addr IP address to check
+ * @param ip_addr_list List of seen ip addresses
+ * @return TRUE when IP address is in list, else FALSE
  */
 int is_ipaddr_in_list(uint32_t ip_addr, ip_addr_list_t ip_addr_list);
 
 /**
- * @brief 
+ * @brief Print DHCP traffic stats
  * 
- * @param cmd_options 
- * @return int 
+ * @param cmd_options Entered command-line arguments
+ * @return 0 on success, 1 on error
  */
 int print_stats(cmd_options_t cmd_options);
 
 /**
- * @brief Get the dhcp msg type object
+ * @brief Get the DHCP message type
  * 
- * @param options 
- * @param dhcp_options_length 
- * @return int 
+ * @param options Pointer to options array
+ * @param dhcp_options_size Size of DHCP options
+ * @return DHCP message type
  */
-int get_dhcp_msg_type(const unsigned char *options, int dhcp_options_length);
+int get_dhcp_msg_type(const unsigned char *options, int dhcp_options_size);
 
 /**
- * @brief 
+ * @brief Filter network trafic to only udp port 67 or port 68 packets
  * 
- * @param handle 
- * @return int 
+ * @param handle Opened (pcap_t *) connection
+ * @return 0 on success, 1 on error
  */
 int apply_filter(pcap_t *handle);
 
 /**
- * @brief 
+ * @brief End program and free used resources
  * 
- * @param signum 
+ * @param signum Number of the received signal
  */
-void sig_handler(int signum);
+void signal_handler(int signum);
 
 /**
- * @brief 
+ * @brief Read packets from pcap file or liste on network interface
  * 
- * @param cmd_options 
- * @param handle 
- * @return int 
+ * @param cmd_options Entered command-line arguments
+ * @param handle Opened (pcap_t *) connection
+ * @return 0 on success, 1 on error
  */
 int read_packets(cmd_options_t cmd_options, pcap_t *handle);
 
 /**
- * @brief Create a log object
+ * @brief Create a record in system log, that ip prefix exceeded 50% of allocations
  * 
- * @param prefix 
- * @return int 
+ * @param prefix IP prefix that will be logged
+ * @return 0 on success, 1 on error
  */
 int create_log(ip_t *prefix);
 
 /**
- * @brief 
+ * @brief Calculate percentage of allocated ip addresses in ip prefix
  * 
- * @param ip_prefix 
- * @return float 
+ * @param ip_prefix IP prefix used for calculation
+ * @return Precentage of allocated ip addresses
  */
 float calc_alloc_precent(ip_t ip_prefix);
 
 /**
- * @brief 
+ * @brief If IP address is in IP prefix refresh stats and add IP address to seen ones
  * 
- * @param packet 
- * @param cmd_options 
- * @param ip_addr_list 
- * @return int 
+ * @param dhcp Pointer to the DHCP ACK data
+ * @param ip_addr_list List of seen ip addresses
+ * @param cmd_options Entered command-line arguments
+ * @return 0 on success, 1 on error
  */
-int parse_packet(const unsigned char *packet, cmd_options_t cmd_options, ip_addr_list_t *ip_addr_list);
+int parse_packet(const struct dhcphdr *dhcp, ip_addr_list_t *ip_addr_list, cmd_options_t cmd_options);
+
+/**
+ * @brief Extract only DHCP ACK packets
+ * 
+ * @param packet Pointer to the packet data
+ * @param cmd_options Entered command-line arguments
+ * @param ip_addr_list List of seen ip addresses
+ * @return 0 on success, 1 on error
+ */
+int extract_dhcp_packet(const unsigned char *packet, cmd_options_t cmd_options, ip_addr_list_t *ip_addr_list);
 
 #endif
