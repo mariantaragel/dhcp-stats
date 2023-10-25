@@ -2,7 +2,7 @@
  * @file dhcp-stats.h
  * @author Marián Tarageľ (xtarag01)
  * @brief Interface of dhcp-stats program
- * @date 23.10.2023
+ * @date 25.10.2023
  */
 
 #ifndef DHCP_STATS_H
@@ -14,6 +14,8 @@ const char usage[] =
     "   -r <filename>   stats will be generated from a pcap file\n"
     "   -i <interface>  interface to listen on\n"
     "   <ip-prefix>     net range for which stats will be generated\n";
+
+const char version[] = "dhcp-stats 1.0\n\nWritten by Marián Tarageľ.\n";
 
 typedef struct ip_address
 {
@@ -68,6 +70,8 @@ typedef struct ip_addr_list
 #define DHCP_HDR_LEN 240
 #define OPT_END 255
 
+#define LOG_MSG "prefix %s/%d exceeded 50%% of allocations\n"
+
 /**
  * @brief Free allocted memory
  * 
@@ -83,6 +87,14 @@ void clean(void *pointer);
  * @return 0 on success, 1 on error
  */
 int string_to_ip_address(char *string, ip_t *ip);
+
+/**
+ * @brief Parse -h, --help and --version flags
+ * 
+ * @param argc Number of arguments
+ * @param argv Array of arguments
+ */
+void parse_extra_options(int argc, char *argv[]);
 
 /**
  * @brief Parse command-line arguments 

@@ -2,7 +2,7 @@
  * @file dhcp-stats.c
  * @author Marián Tarageľ (xtarag01)
  * @brief Monitoring of DHCP communication
- * @date 23.10.2023
+ * @date 25.10.2023
  */
 
 #include <stdio.h> // fprintf(), perror()
@@ -74,8 +74,26 @@ int string_to_ip_address(char *string, ip_t *ip)
     return 0;
 }
 
+void parse_extra_options(int argc, char *argv[])
+{
+    for (int optind = 0; optind < argc; optind++) {
+        if (strcmp(argv[optind], "-h") == 0 || strcmp(argv[optind], "--help") == 0) { // help flag
+            printf("%s", usage);
+            exit(EXIT_SUCCESS);
+        } else if (strcmp(argv[optind], "--version") == 0) { // version flag
+            printf("%s", version);
+            exit(EXIT_SUCCESS);
+        }
+    }
+}
+
 int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options)
 {
+    if (argc < 4) {
+        fprintf(stderr, "Incorrect number of arguments\n");
+        return 1;
+    }
+    
     for (int optind = 1; optind < argc; optind++) { // skip program name
         if (strcmp(argv[optind], "-r") == 0 && optind + 1 < argc) {
             cmd_options->filename = argv[optind + 1]; // take filename from next position
@@ -83,14 +101,6 @@ int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options)
         } else if (strcmp(argv[optind], "-i") == 0 && optind + 1 < argc) {
             cmd_options->interface = argv[optind + 1]; // take intefrace name from next position
             optind++;
-        } else if (strcmp(argv[optind], "-h") == 0 || strcmp(argv[optind], "--help") == 0) { // help flag
-            printf("%s", usage);
-            clean(cmd_options->ip_prefixes);
-            exit(EXIT_SUCCESS);
-        } else if (strcmp(argv[optind], "--version") == 0) { // version flag
-            printf("dhcp-stats 1.0\n\nWritten by Marián Tarageľ.\n");
-            clean(cmd_options->ip_prefixes);
-            exit(EXIT_SUCCESS);
         } else { // argument is not flag, than consider it as ip prefix 
             ip_t ip_prefix;
             if (string_to_ip_address(argv[optind], &ip_prefix)) {
@@ -107,11 +117,6 @@ int parse_arguments(int argc, char *argv[], cmd_options_t *cmd_options)
 
             cmd_options->ip_prefixes[cmd_options->count_ip_prefixes - 1] = ip_prefix;
         }
-    }
-
-    if (argc < 4) {
-        fprintf(stderr, "Incorrect number of arguments\n");
-        return 1;
     }
 
     // At least filename or inteface name must be set
@@ -316,8 +321,11 @@ int create_log(ip_t *prefix)
             return 1;
         }
 
-        syslog(LOG_NOTICE, "prefix %s/%d exceeded 50%% of allocations", ipaddr_str, prefix->mask);
+        syslog(LOG_NOTICE, LOG_MSG, ipaddr_str, prefix->mask);
+        
         closelog();
+
+        printf(LOG_MSG, ipaddr_str, prefix->mask);
 
         prefix->is_logged = TRUE; // ip address will be logged only once
     }
@@ -393,6 +401,8 @@ int extract_dhcp_packet(const unsigned char *packet, cmd_options_t cmd_options, 
 int main(int argc, char *argv[])
 {
     signal(SIGINT, signal_handler);
+
+    parse_extra_options(argc, argv);
 
     cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
     if (parse_arguments(argc, argv, &cmd_options)){
