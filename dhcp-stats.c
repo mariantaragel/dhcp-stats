@@ -256,6 +256,8 @@ int apply_filter(pcap_t *handle)
         return 1;
     }
 
+    pcap_freecode(&fp);
+
     return 0;
 }
 
@@ -324,8 +326,6 @@ int create_log(ip_t *prefix)
         syslog(LOG_NOTICE, LOG_MSG, ipaddr_str, prefix->mask);
         
         closelog();
-
-        printf(LOG_MSG, ipaddr_str, prefix->mask);
 
         prefix->is_logged = TRUE; // ip address will be logged only once
     }
