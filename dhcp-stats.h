@@ -182,7 +182,7 @@ int apply_filter(pcap_t *handle);
 void signal_handler(int signum);
 
 /**
- * @brief Read packets from pcap file or liste on network interface
+ * @brief Read packets from pcap file or listen on network interface
  * 
  * @param cmd_options Entered command-line arguments
  * @param handle Opened (pcap_t *) connection
