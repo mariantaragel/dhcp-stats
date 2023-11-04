@@ -296,8 +296,7 @@ int read_packets(cmd_options_t cmd_options, pcap_t *handle)
         } else if (ret_val == 0) { // Packet buffer timeout expired
             continue;
         } else if (ret_val == PCAP_ERROR_BREAK) { // No more packets to read
-            getch();
-            break;
+            continue;
         } else { // Generic pcap error
             clean(ip_addr_list.list);
             endwin();
