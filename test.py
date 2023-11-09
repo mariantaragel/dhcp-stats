@@ -94,7 +94,13 @@ def test_04():
     send_dhcp("192.168.4.15", "request")
     send_dhcp("192.168.4.15", "ack")
 
+def test_05():
+    # 192.168.1.10/24 254 15 5.91%
+
+    generate_range("192.168.1.1", "192.168.1.15")
+
 # test_01()
 # test_02()
 # test_03()
 # test_04()
+test_05()

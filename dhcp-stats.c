@@ -21,8 +21,9 @@
 #include "dhcp-stats.h"
 
 // global variables for cleaning purpose in signal hendler
-cmd_options_t cmd_options;
-ip_addr_list_t ip_addr_list;
+cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
+ip_addr_list_t ip_addr_list = {NULL, 0};
+pcap_t *handle;
 
 void clean(void *pointer)
 {
@@ -179,7 +180,7 @@ pcap_t *open_pcap(cmd_options_t cmd_options)
 int is_ipaddr_in_subnet(uint32_t ip_addr, ip_t *subnet)
 {
     uint32_t net_mask = 0xFFFFFFFF << (IP_ADDR_BIT_LEN - subnet->mask); // Create network mask
-    if ((ip_addr & htonl(net_mask)) == subnet->address) // Bitwise and between ip address and network mask
+    if ((ip_addr & htonl(net_mask)) == (subnet->address & htonl(net_mask))) // Bitwise and between ip address and network mask
         return TRUE;
     else
         return FALSE;
@@ -263,6 +264,8 @@ int apply_filter(pcap_t *handle)
 
 void signal_handler(int signum)
 {
+    pcap_breakloop(handle);
+    pcap_close(handle);
     clean(cmd_options.ip_prefixes);
     clean(ip_addr_list.list);
     endwin();
@@ -277,8 +280,6 @@ int read_packets(cmd_options_t cmd_options, pcap_t *handle)
         endwin();
         return 1;
     }
-
-    ip_addr_list_t ip_addr_list = {NULL, 0};
 
     while (TRUE) {
         struct pcap_pkthdr *header;
@@ -403,13 +404,12 @@ int main(int argc, char *argv[])
 
     parse_extra_options(argc, argv);
 
-    cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
     if (parse_arguments(argc, argv, &cmd_options)){
         clean(cmd_options.ip_prefixes);
         return EXIT_FAILURE;
     }
 
-    pcap_t *handle = open_pcap(cmd_options);
+    handle = open_pcap(cmd_options);
     if (handle == NULL) {
         clean(cmd_options.ip_prefixes);
         return EXIT_FAILURE;
