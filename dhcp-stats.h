@@ -2,7 +2,7 @@
  * @file dhcp-stats.h
  * @author Marián Tarageľ (xtarag01)
  * @brief Interface of dhcp-stats program
- * @date 25.10.2023
+ * @date 11.11.2023
  */
 
 #ifndef DHCP_STATS_H
@@ -20,6 +20,7 @@ const char version[] = "dhcp-stats 1.0\n\nWritten by Marián Tarageľ.\n";
 typedef struct ip_address
 {
     uint32_t address;
+    uint32_t network_ipaddr;
     unsigned int mask;
     long int num_of_useable_ipaddr;
     unsigned int allocated_ipaddr;
@@ -124,12 +125,21 @@ long int count_useable_ip_addresses(unsigned int net_mask);
 int comparator(const void *ip_prefix_a, const void *ip_prefix_b);
 
 /**
- * @brief Open connection for sniffing or open pcap file
+ * @brief Open connection for sniffing or open a pcap file
  * 
  * @param cmd_options Entered command-line arguments
  * @return (pcap_t *) coonection on success, NULL on error
  */
 pcap_t *open_pcap(cmd_options_t cmd_options);
+
+/**
+ * @brief Bbitwise and between network mask and the IP addresss
+ * 
+ * @param ip_addr IP address
+ * @param mask_len Length of the network subnet (0 - 32)
+ * @return Masked IP address 
+ */
+uint32_t bit_mask_address(uint32_t ip_addr, unsigned int mask_len);
 
 /**
  * @brief Check whether IP is in network subnet
