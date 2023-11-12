@@ -2,7 +2,7 @@
  * @file dhcp-stats.c
  * @author Marián Tarageľ (xtarag01)
  * @brief Monitoring of DHCP communication
- * @date 11.11.2023
+ * @date 12.11.2023
  */
 
 #include <stdio.h> // fprintf(), perror()
@@ -20,10 +20,9 @@
 #include <netinet/udp.h> // struct udphdr
 #include "dhcp-stats.h"
 
-// global variables for cleaning purpose in signal hendler
-cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
-ip_addr_list_t ip_addr_list = {NULL, 0};
+// global variables for correct end of the program
 pcap_t *handle;
+int end_loop = FALSE;
 
 void clean(void *pointer)
 {
@@ -271,11 +270,7 @@ int apply_filter(pcap_t *handle)
 void signal_handler(int signum)
 {
     pcap_breakloop(handle);
-    pcap_close(handle);
-    clean(cmd_options.ip_prefixes);
-    clean(ip_addr_list.list);
-    endwin();
-    exit(EXIT_SUCCESS);
+    end_loop = TRUE;
 }
 
 int read_packets(cmd_options_t cmd_options, pcap_t *handle)
@@ -287,12 +282,18 @@ int read_packets(cmd_options_t cmd_options, pcap_t *handle)
         return 1;
     }
 
+    ip_addr_list_t ip_addr_list = {NULL, 0};
+
     while (TRUE) {
         struct pcap_pkthdr *header;
         const unsigned char *packet;
         
         // read next packet
         int ret_val = pcap_next_ex(handle, &header, &packet);
+        
+        if (end_loop) {
+            break;
+        }
         
         if (ret_val == 1) { // Packet was read without problems
             if (extract_dhcp_packet(packet, cmd_options, &ip_addr_list)) {
@@ -410,6 +411,7 @@ int main(int argc, char *argv[])
 
     parse_extra_options(argc, argv);
 
+    cmd_options_t cmd_options = {NULL, NULL, NULL, 0};
     if (parse_arguments(argc, argv, &cmd_options)){
         clean(cmd_options.ip_prefixes);
         return EXIT_FAILURE;

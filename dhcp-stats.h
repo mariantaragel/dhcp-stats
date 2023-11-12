@@ -2,7 +2,7 @@
  * @file dhcp-stats.h
  * @author Marián Tarageľ (xtarag01)
  * @brief Interface of dhcp-stats program
- * @date 11.11.2023
+ * @date 12.11.2023
  */
 
 #ifndef DHCP_STATS_H
