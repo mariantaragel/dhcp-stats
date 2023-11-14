@@ -1,6 +1,6 @@
 # Project: Monitoring of DHCP communication
 # Author: Marián Tarageľ (xtarag01)
-# Date: 12.11.2023
+# Date: 14.11.2023
 
 EXECUTABLE = dhcp-stats
 LOGIN = xtarag01

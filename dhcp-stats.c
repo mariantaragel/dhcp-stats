@@ -2,7 +2,7 @@
  * @file dhcp-stats.c
  * @author Marián Tarageľ (xtarag01)
  * @brief Monitoring of DHCP communication
- * @date 12.11.2023
+ * @date 14.11.2023
  */
 
 #include <stdio.h> // fprintf(), perror()
@@ -67,7 +67,8 @@ int string_to_ip_address(char *string, ip_t *ip)
     }
 
     ip->mask = net_mask;
-    ip->network_ipaddr = bit_mask_address(ip->address, ip->mask);
+    ip->network_ipaddr = bitwise_and_mask_address(ip->address, ip->mask);
+    ip->broadcast_ipaddr = bitwise_or_mask_address(ip->address, ip->mask);
     ip->num_of_useable_ipaddr = count_useable_ip_addresses(ip->mask);
     ip->allocated_ipaddr = 0;
     ip->is_logged = FALSE;
@@ -177,15 +178,24 @@ pcap_t *open_pcap(cmd_options_t cmd_options)
     return handle;
 }
 
-uint32_t bit_mask_address(uint32_t ip_addr, unsigned int mask_len)
+uint32_t bitwise_or_mask_address(uint32_t ip_addr, unsigned int mask_len)
 {
-    uint32_t net_mask = 0xFFFFFFFF << (IP_ADDR_BIT_LEN - mask_len); // Create network mask
-    return ip_addr & htonl(net_mask); // Bitwise and between ip address and network mask
+    uint32_t mask = 0xFFFFFFFF >> mask_len; // Create mask
+    return ip_addr | htonl(mask); // Bitwise or between ip address and mask
+}
+
+uint32_t bitwise_and_mask_address(uint32_t ip_addr, unsigned int mask_len)
+{
+    uint32_t net_mask = 0xFFFFFFFF << (IP_ADDR_BIT_LEN - mask_len); // Create mask
+    return ip_addr & htonl(net_mask); // Bitwise and between ip address and mask
 }
 
 int is_ipaddr_in_subnet(uint32_t ip_addr, ip_t *subnet)
 {
-    if (bit_mask_address(ip_addr, subnet->mask) == subnet->network_ipaddr)
+    if (ip_addr == subnet->network_ipaddr || ip_addr == subnet->broadcast_ipaddr)
+        return FALSE;
+
+    if (bitwise_and_mask_address(ip_addr, subnet->mask) == subnet->network_ipaddr)
         return TRUE;
     else
         return FALSE;
