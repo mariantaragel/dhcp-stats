@@ -1,6 +1,6 @@
 .TH DHCP-STATS 1
 .SH NAME
-dhcp-stats \- diplay statistics about DHCP traffic
+dhcp-stats \- diplay statistics about the IP prefix utilization
 .SH SYNOPSIS
 .B dhcp-stats
 [\fB\-n\fR \fIFILENAME\fR]
@@ -11,13 +11,13 @@ The program will monitor DHCP traffic and show stats about IP prefix utilization
 .SH OPTIONS
 .TP
 \fB\-r\fR=\fIFILENAME\fR
-read packets from pcap file
+Read packets from pcap file (.pcap or .pcapng). Pcap file must exists. This option can not be combined with -i, but at least one must be present.
 .TP
 \fB\-i\fR=\fIINTERFACE-NAME\fR
-capture packets from network interface
+Capture packets from network interface. Network interface must exists. This option can not be combined with -r, but at least one must be present.
 .TP
 \fIip-prefix\f
-net range for which stats will be generated in format x.x.x.x/y, where x.x.x.x is valid IP address, and y is a length of network prefix
+Net range for which stats will be generated in format x.x.x.x/y, where x.x.x.x is valid IP address, and y is a length of network prefix (0 - 32). Program can work with multiple IP prefixes. They can also overlap. If the user will enter IP prefix that is not valid, for example 192.168.1.15/24, that the IP adress will be masked based on the subnet mask length to 192.168.1.0/24. Program will use this IP adress instead for checking wheteher the IP address is in the subnet. But in the final output, original IP address will be printed.
 .TP
 .BR \-h ", " \-\-help
 display help and exit
