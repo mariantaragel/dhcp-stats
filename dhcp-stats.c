@@ -140,8 +140,8 @@ long int count_useable_ip_addresses(unsigned int net_mask)
     long int num_of_useable_ipaddr = pow(2, host_bits) - 2;
     
     // Correction of result (for ip prefixes 32 and 31)
-    if (num_of_useable_ipaddr <= 0)
-        num_of_useable_ipaddr += 2;
+    if (num_of_useable_ipaddr < 0)
+        num_of_useable_ipaddr = 0;
     
     return num_of_useable_ipaddr;
 }
@@ -186,7 +186,12 @@ uint32_t bitwise_or_mask_address(uint32_t ip_addr, unsigned int mask_len)
 
 uint32_t bitwise_and_mask_address(uint32_t ip_addr, unsigned int mask_len)
 {
-    uint32_t net_mask = 0xFFFFFFFF << (IP_ADDR_BIT_LEN - mask_len); // Create mask
+    uint32_t net_mask;
+    if (mask_len == 0) {
+        net_mask = 0x00000000;
+    } else {
+        net_mask = 0xFFFFFFFF << (IP_ADDR_BIT_LEN - mask_len); // Create mask
+    }
     return ip_addr & htonl(net_mask); // Bitwise and between ip address and mask
 }
 
@@ -241,17 +246,22 @@ int print_stats(cmd_options_t cmd_options)
 int get_dhcp_msg_type(const unsigned char *options, int dhcp_options_size)
 {
     int dhcp_msg_type = -1;
+
+    int i = 0;
+    while (i < dhcp_options_size) {
+        uint8_t option_type = options[i];
+        uint8_t option_length = options[i + 1];
     
-    for (int i = 0; i < dhcp_options_size; i++) {
-        uint8_t optcode = options[i];
-        if (optcode == OPT_MSG_TYPE) { // DHCP message type
-            dhcp_msg_type = options[i + 2]; // [i+2] because first is option length and then option value
-        } else if (optcode == 0) { // padding
+        if (option_type == OPT_MSG_TYPE) { // DHCP message type
+            dhcp_msg_type = options[i + option_length + 1]; // because first is option length and then option value
+            break;
+        } else if (option_type == 0) { // padding
             continue;
-        } else if (optcode == OPT_END) { // end of options
+        } else if (option_type == OPT_END) { // end of options
             break;
         }
-        i += options[i + 1] + 1; // [i+1] is option length and +1 for skiping option code 
+        
+        i += option_length + 2; // jump to the next option (+2 for skipping option type and go to next option)
     }
 
     return dhcp_msg_type;
@@ -344,6 +354,10 @@ int create_log(ip_t *prefix)
         
         closelog();
 
+        printw(LOG_MSG, ipaddr_str, prefix->mask);
+        
+        refresh();
+
         prefix->is_logged = TRUE; // ip address will be logged only once
     }
 
@@ -352,7 +366,11 @@ int create_log(ip_t *prefix)
 
 float calc_alloc_precent(ip_t ip_prefix)
 {
-    return (float) ip_prefix.allocated_ipaddr / (float) ip_prefix.num_of_useable_ipaddr * 100.0;
+    if (ip_prefix.num_of_useable_ipaddr == 0) {
+        return 100.0;
+    } else {
+        return (float) ip_prefix.allocated_ipaddr / (float) ip_prefix.num_of_useable_ipaddr * 100.0;
+    }
 }
 
 int parse_packet(const struct dhcphdr *dhcp, ip_addr_list_t *ip_addr_list, cmd_options_t cmd_options)
@@ -396,14 +414,14 @@ int extract_dhcp_packet(const unsigned char *packet, cmd_options_t cmd_options, 
 {
     // extract IP packet
     const struct iphdr *ip = (struct iphdr *) (packet + ETHER_HDR_LEN);
-    unsigned int size_ip = ip->ihl * 4;
+    unsigned int ip_hdr_len = ip->ihl * 4;
 
     // extract UDP packet
-    const struct udphdr *udp = (struct udphdr *) (packet + ETHER_HDR_LEN + size_ip);
+    const struct udphdr *udp = (struct udphdr *) (packet + ETHER_HDR_LEN + ip_hdr_len);
     unsigned int size_udp_payload = (ntohs(udp->len) - UDP_HDR_LEN);
 
     // extract DHCP packet
-    const struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + size_ip + UDP_HDR_LEN);
+    const struct dhcphdr *dhcp = (struct dhcphdr *) (packet + ETHER_HDR_LEN + ip_hdr_len + UDP_HDR_LEN);
     unsigned int size_dhcp_options = size_udp_payload - DHCP_HDR_LEN;
 
     if (get_dhcp_msg_type(dhcp->options, size_dhcp_options) == DHCP_ACK) {
