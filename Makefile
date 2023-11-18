@@ -20,7 +20,7 @@ $(EXECUTABLE): dhcp-stats.o
 
 pack: $(TAR_FILE)
 
-$(TAR_FILE): *.c *.h Makefile manual.pdf $(EXECUTABLE).1
+$(TAR_FILE): *.c *.h Makefile manual.pdf $(EXECUTABLE).1 README.md
 	tar cvf $@ $^
 
 upload: $(TAR_FILE)
