@@ -354,10 +354,6 @@ int create_log(ip_t *prefix)
         
         closelog();
 
-        printw(LOG_MSG, ipaddr_str, prefix->mask);
-        
-        refresh();
-
         prefix->is_logged = TRUE; // ip address will be logged only once
     }
 
